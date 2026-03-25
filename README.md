@@ -6,7 +6,7 @@
 
 ## 🤔 What Is This Tool?
 
-Imagine you are an engineer and your app just crashed at 3 AM. You have hundreds of lines of error logs but no idea where to start. This tool reads those logs, finds the important parts, and uses an AI to tell you **exactly what went wrong and how to fix it** — in plain English.
+Imagine you are an engineer and your app just crashed at 3 AM. You have hundreds of lines of error logs but no idea where to start. This tool reads those logs, finds the important parts, and uses an AI to tell you **exactly what went wrong and how to fix it**  in plain English.
 
 It is called a **RAG** tool. RAG stands for **Retrieval-Augmented Generation**. Here is what that means in simple terms:
 
