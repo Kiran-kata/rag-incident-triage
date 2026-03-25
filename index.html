@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RAG Incident Triage Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo-area">
+      <h1>RAG <span>Incident Triage</span> Assistant</h1>
+      <p>Retrieval-Augmented Generation · Log Analysis · Root Cause Analysis</p>
+    </div>
+  </header>
+
+  <!-- Pipeline -->
+  <div class="pipeline">
+    <div class="pipe-step">
+      <div class="pipe-icon" id="pipe-ingest">📄</div>
+      <div class="pipe-label">Ingest Logs</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="pipe-icon" id="pipe-chunk">✂️</div>
+      <div class="pipe-label">Chunking</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="pipe-icon" id="pipe-embed">🔢</div>
+      <div class="pipe-label">Embedding</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="pipe-icon" id="pipe-retrieve">🔍</div>
+      <div class="pipe-label">Retrieval</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="pipe-icon" id="pipe-context">📎</div>
+      <div class="pipe-label">Context Inject</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="pipe-icon" id="pipe-llm">🤖</div>
+      <div class="pipe-label">LLM Engine</div>
+    </div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step">
+      <div class="pipe-icon" id="pipe-out">📋</div>
+      <div class="pipe-label">RCA Report</div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <!-- Left: Log input + chunks -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">📄 Log Corpus</span>
+          <button class="preset-btn" onclick="loadPreset()">Load Sample Logs</button>
+        </div>
+        <div class="panel-body">
+          <textarea id="logInput" placeholder="Paste your application logs here...
+e.g.
+2024-07-15 03:12:44 ERROR [PaymentService] DB connection timeout after 5000ms
+2024-07-15 03:12:45 WARN  [RetryHandler] Retry attempt 1/3 for txn-8821
+..."></textarea>
+          <div style="display:flex; gap:8px; margin-top:10px;">
+            <button class="btn" onclick="chunkLogs()" id="chunkBtn">Chunk & Index</button>
+            <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+          </div>
+          <div style="margin-top:8px; font-size:10px; color:var(--muted)" id="chunkStats"></div>
+        </div>
+      </div>
+
+      <!-- Chunks -->
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-header">
+          <span class="panel-title">✂️ Chunks (Vector Store)</span>
+          <span id="chunkCount" style="font-size:10px;color:var(--muted)">0 chunks</span>
+        </div>
+        <div class="panel-body">
+          <div class="chunks-container" id="chunksDisplay">
+            <div style="color:var(--muted);font-size:11px;text-align:center;padding:20px 0;">Index logs to see chunks</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Query + Context -->
+    <div>
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">🔍 Query</span>
+        </div>
+        <div class="panel-body">
+          <div class="presets" id="queryPresets">
+            <span style="font-size:10px;color:var(--muted);align-self:center;">Quick:</span>
+            <button class="preset-btn" onclick="setQuery('What caused the database connection failures?')">DB failures</button>
+            <button class="preset-btn" onclick="setQuery('Why are payment transactions timing out?')">Payment timeouts</button>
+            <button class="preset-btn" onclick="setQuery('Summarize all errors and their probable root cause')">Full RCA</button>
+            <button class="preset-btn" onclick="setQuery('Which service is throwing the most errors?')">Error source</button>
+          </div>
+          <div class="query-row">
+            <input type="text" id="queryInput" placeholder="Ask about the incident..." value="What caused the database connection failures?"/>
+            <button class="btn" onclick="runRAG()" id="ragBtn" disabled>Analyze</button>
+          </div>
+          <div style="font-size:10px;color:var(--muted)">↑ Retrieves relevant chunks, injects as context, sends to LLM</div>
+
+          <!-- LLM Provider & API Key -->
+          <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--border);">
+            <div style="font-size: 10px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">🤖 LLM Provider</div>
+            <select id="providerSelect" onchange="ApiKeyManager.onProviderChange()" style="width:100%; margin-bottom:10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; color:var(--text); font-family:var(--mono); font-size:12px; padding:9px 12px; outline:none; cursor:pointer;">
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+              <option value="groq">Groq</option>
+              <option value="mistral">Mistral AI</option>
+              <option value="custom">Custom / Self-hosted</option>
+            </select>
+
+            <!-- Custom provider fields -->
+            <div id="customProviderFields" style="display:none; margin-bottom:10px;">
+              <input type="text" id="customBaseUrl" placeholder="Base URL (e.g. https://your-api.example.com/v1)" style="width:100%; margin-bottom:6px;"/>
+              <input type="text" id="customModel" placeholder="Model name (e.g. llama-3-8b)" style="width:100%;"/>
+            </div>
+
+            <div style="font-size: 10px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px;">🔐 API Key</div>
+            <input type="password" id="apiKeyInput" placeholder="Enter your API key..."/>
+            <div style="font-size: 9px; color: var(--muted); margin-top:6px;" id="providerHint"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Retrieved context -->
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-header">
+          <span class="panel-title">📎 Retrieved Context Window</span>
+          <span id="retrievedCount" style="font-size:10px;color:var(--muted)">—</span>
+        </div>
+        <div class="panel-body">
+          <div class="context-window" id="contextWindow">Retrieved chunks will appear here before being sent to the LLM...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Output -->
+  <div class="output-full" style="margin-top:20px;">
+    <div class="output-tabs">
+      <button class="tab active" onclick="switchTab(this,'tab-rca')">🧠 RCA Report</button>
+      <button class="tab" onclick="switchTab(this,'tab-summary')">📋 Incident Summary</button>
+      <button class="tab" onclick="switchTab(this,'tab-prompt')">🔧 Prompt Debug</button>
+    </div>
+
+    <div class="tab-content active" id="tab-rca">
+      <div id="severityBadge"></div>
+      <div class="stats-row" id="statsRow" style="display:none">
+        <div class="stat-chip">Chunks retrieved: <span id="st-chunks">0</span></div>
+        <div class="stat-chip">Context tokens (est.): <span id="st-tokens">0</span></div>
+        <div class="stat-chip">Errors found: <span id="st-errors">0</span></div>
+      </div>
+      <div class="section-label">Root Cause Analysis</div>
+      <div class="response-box" id="rcaOutput">Run a query to generate RCA...</div>
+    </div>
+
+    <div class="tab-content" id="tab-summary">
+      <div class="response-box" id="summaryOutput">Run a query to generate incident summary...</div>
+    </div>
+
+    <div class="tab-content" id="tab-prompt">
+      <div class="section-label">System Prompt</div>
+      <div class="context-window" id="systemPromptDisplay" style="margin-bottom:12px;"></div>
+      <div class="section-label">Full User Message (with injected context)</div>
+      <div class="context-window" id="userPromptDisplay"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="config.js"></script>
+<script src="api-key.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
