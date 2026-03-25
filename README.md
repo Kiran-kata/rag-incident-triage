@@ -1,6 +1,6 @@
 # RAG Incident Triage Assistant
 
-> **A beginner-friendly guide — no prior AI or programming knowledge required.**
+> **A beginner-friendly guide no prior AI or programming knowledge required.**
 
 ---
 
